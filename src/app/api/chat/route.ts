@@ -26,7 +26,7 @@ const allowedModels = [
   defaultModel,
   "anthropic/claude-3-haiku",
   "deepseek/deepseek-chat",
-  "google/gemini-flash-1.5",
+  "google/gemini-2.0-flash-001",
 ] as const;
 
 function isValidMessage(message: unknown): message is ChatMessage {

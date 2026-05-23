@@ -30,8 +30,8 @@ const models = [
     label: "DeepSeek Chat",
   },
   {
-    id: "google/gemini-flash-1.5",
-    label: "Gemini Flash 1.5",
+    id: "google/gemini-2.0-flash-001",
+    label: "Gemini 2.0 Flash",
   },
 ] as const;
 
