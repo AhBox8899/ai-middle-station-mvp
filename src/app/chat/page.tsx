@@ -16,6 +16,27 @@ type Message = {
   content: string;
 };
 
+const models = [
+  {
+    id: "openai/gpt-4o-mini",
+    label: "GPT-4o Mini",
+  },
+  {
+    id: "anthropic/claude-3-haiku",
+    label: "Claude 3 Haiku",
+  },
+  {
+    id: "deepseek/deepseek-chat",
+    label: "DeepSeek Chat",
+  },
+  {
+    id: "google/gemini-flash-1.5",
+    label: "Gemini Flash 1.5",
+  },
+] as const;
+
+const defaultModel = "openai/gpt-4o-mini";
+
 const welcomeMessage: Message = {
   id: 1,
   role: "assistant",
@@ -26,6 +47,7 @@ const welcomeMessage: Message = {
 export default function ChatPage() {
   const [messages, setMessages] = useState<Message[]>([welcomeMessage]);
   const [input, setInput] = useState("");
+  const [selectedModel, setSelectedModel] = useState(defaultModel);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -65,6 +87,7 @@ export default function ChatPage() {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
+          model: selectedModel,
           messages: nextMessages
             .filter((message) => message.id !== 1)
             .map(({ role, content }) => ({
@@ -221,6 +244,27 @@ export default function ChatPage() {
               onSubmit={handleSubmit}
               className="border-t border-[#ececea] bg-white p-3 sm:p-4"
             >
+              <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                <label
+                  htmlFor="model"
+                  className="text-xs font-semibold uppercase tracking-[0.12em] text-[#6f736f]"
+                >
+                  Model
+                </label>
+                <select
+                  id="model"
+                  value={selectedModel}
+                  onChange={(event) => setSelectedModel(event.target.value)}
+                  disabled={isLoading}
+                  className="h-10 rounded-[8px] border border-[#d6d6d0] bg-[#fbfbfa] px-3 text-sm font-medium text-[#202123] outline-none transition focus:border-[#8f9a92] focus:ring-4 focus:ring-[#e6ebe7] disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {models.map((model) => (
+                    <option key={model.id} value={model.id}>
+                      {model.label} - {model.id}
+                    </option>
+                  ))}
+                </select>
+              </div>
               <div className="flex flex-col gap-3 sm:flex-row">
                 <textarea
                   value={input}

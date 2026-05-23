@@ -5,6 +5,7 @@ type ChatMessage = {
 
 type ChatRequestBody = {
   messages?: ChatMessage[];
+  model?: string;
 };
 
 type OpenRouterChoice = {
@@ -19,6 +20,14 @@ type OpenRouterResponse = {
     message?: string;
   };
 };
+
+const defaultModel = "openai/gpt-4o-mini";
+const allowedModels = [
+  defaultModel,
+  "anthropic/claude-3-haiku",
+  "deepseek/deepseek-chat",
+  "google/gemini-flash-1.5",
+] as const;
 
 function isValidMessage(message: unknown): message is ChatMessage {
   if (!message || typeof message !== "object") {
@@ -48,6 +57,7 @@ export async function POST(request: Request) {
   }
 
   const messages = body.messages;
+  const model = body.model || defaultModel;
 
   if (!Array.isArray(messages) || messages.length === 0) {
     return Response.json(
@@ -62,6 +72,13 @@ export async function POST(request: Request) {
         error:
           "Each message must include role and non-empty content. Role must be system, user, or assistant.",
       },
+      { status: 400 },
+    );
+  }
+
+  if (!allowedModels.includes(model as (typeof allowedModels)[number])) {
+    return Response.json(
+      { error: "Selected model is not supported." },
       { status: 400 },
     );
   }
@@ -88,7 +105,7 @@ export async function POST(request: Request) {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          model: "openai/gpt-4o-mini",
+          model,
           messages,
         }),
       },
