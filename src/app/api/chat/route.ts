@@ -22,12 +22,70 @@ type OpenRouterResponse = {
 };
 
 const defaultModel = "openai/gpt-4o-mini";
+const maxMessageLength = 2000;
+const rateLimitWindowMs = 60 * 1000;
+const rateLimitMaxRequests = 10;
 const allowedModels = [
   defaultModel,
   "anthropic/claude-3-haiku",
   "deepseek/deepseek-chat",
   "google/gemini-2.0-flash-001",
 ] as const;
+
+const rateLimitStore = new Map<string, { count: number; resetAt: number }>();
+
+function getClientIp(request: Request) {
+  const forwardedFor = request.headers.get("x-forwarded-for");
+  if (forwardedFor) {
+    return forwardedFor.split(",")[0]?.trim() || "unknown";
+  }
+
+  return (
+    request.headers.get("x-real-ip") ||
+    request.headers.get("cf-connecting-ip") ||
+    "unknown"
+  );
+}
+
+function isRateLimited(ip: string) {
+  const now = Date.now();
+  const current = rateLimitStore.get(ip);
+
+  if (!current || current.resetAt <= now) {
+    rateLimitStore.set(ip, {
+      count: 1,
+      resetAt: now + rateLimitWindowMs,
+    });
+    return false;
+  }
+
+  if (current.count >= rateLimitMaxRequests) {
+    return true;
+  }
+
+  current.count += 1;
+  return false;
+}
+
+function getOpenRouterErrorMessage(status: number) {
+  if (status === 401) {
+    return "API authentication failed.";
+  }
+
+  if (status === 402) {
+    return "API balance may be insufficient.";
+  }
+
+  if (status === 429) {
+    return "Model is busy. Please try again later.";
+  }
+
+  if (status >= 500) {
+    return "AI service temporarily unavailable.";
+  }
+
+  return "Chat request failed. Please try again.";
+}
 
 function isValidMessage(message: unknown): message is ChatMessage {
   if (!message || typeof message !== "object") {
@@ -45,6 +103,14 @@ function isValidMessage(message: unknown): message is ChatMessage {
 }
 
 export async function POST(request: Request) {
+  const clientIp = getClientIp(request);
+  if (isRateLimited(clientIp)) {
+    return Response.json(
+      { error: "Too many requests. Please slow down." },
+      { status: 429 },
+    );
+  }
+
   let body: ChatRequestBody;
 
   try {
@@ -74,6 +140,10 @@ export async function POST(request: Request) {
       },
       { status: 400 },
     );
+  }
+
+  if (messages.some((message) => message.content.length > maxMessageLength)) {
+    return Response.json({ error: "Message is too long." }, { status: 400 });
   }
 
   if (!allowedModels.includes(model as (typeof allowedModels)[number])) {
@@ -116,9 +186,7 @@ export async function POST(request: Request) {
     if (!openRouterResponse.ok) {
       return Response.json(
         {
-          error:
-            data.error?.message ||
-            `OpenRouter request failed with status ${openRouterResponse.status}.`,
+          error: getOpenRouterErrorMessage(openRouterResponse.status),
         },
         { status: openRouterResponse.status },
       );

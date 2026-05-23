@@ -36,6 +36,7 @@ const models = [
 ] as const;
 
 const defaultModel = "openai/gpt-4o-mini";
+const maxMessageLength = 2000;
 
 const welcomeMessage: Message = {
   id: 1,
@@ -51,10 +52,11 @@ export default function ChatPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
   const bottomRef = useRef<HTMLDivElement>(null);
+  const isMessageTooLong = input.length > maxMessageLength;
 
   const canSend = useMemo(
-    () => input.trim().length > 0 && !isLoading,
-    [input, isLoading],
+    () => input.trim().length > 0 && !isLoading && !isMessageTooLong,
+    [input, isLoading, isMessageTooLong],
   );
 
   useEffect(() => {
@@ -63,7 +65,7 @@ export default function ChatPage() {
 
   async function sendMessage() {
     const userContent = input.trim();
-    if (!userContent || isLoading) {
+    if (!userContent || isLoading || isMessageTooLong) {
       return;
     }
 
@@ -123,7 +125,9 @@ export default function ChatPage() {
     } catch (requestError) {
       console.error("Chat request failed", requestError);
       setError(
-        "Sorry, the chat request failed. Please check your API key or try again.",
+        requestError instanceof Error
+          ? requestError.message
+          : "Sorry, the chat request failed. Please try again.",
       );
     } finally {
       setIsLoading(false);
@@ -233,7 +237,7 @@ export default function ChatPage() {
               )}
 
               {error && (
-                <div className="rounded-[8px] border border-[#f0c7bc] bg-[#fff4f1] px-4 py-3 text-sm leading-6 text-[#8b3222]">
+                <div className="rounded-[8px] border border-[#e59483] bg-[#fff0ec] px-4 py-3 text-sm font-medium leading-6 text-[#8b3222] shadow-sm">
                   {error}
                 </div>
               )}
@@ -268,7 +272,12 @@ export default function ChatPage() {
               <div className="flex flex-col gap-3 sm:flex-row">
                 <textarea
                   value={input}
-                  onChange={(event) => setInput(event.target.value)}
+                  onChange={(event) => {
+                    setInput(event.target.value);
+                    if (error) {
+                      setError("");
+                    }
+                  }}
                   onKeyDown={handleKeyDown}
                   placeholder="Ask anything..."
                   rows={1}
@@ -283,8 +292,14 @@ export default function ChatPage() {
                   {isLoading ? "Sending..." : "Send"}
                 </button>
               </div>
+              {isMessageTooLong && (
+                <p className="mt-2 text-sm font-medium text-[#8b3222]">
+                  Message is too long.
+                </p>
+              )}
               <p className="mt-2 text-xs text-[#777b77]">
-                Press Enter to send. Press Shift + Enter for a new line.
+                Press Enter to send. Press Shift + Enter for a new line.{" "}
+                {input.length}/{maxMessageLength}
               </p>
             </form>
           </div>
